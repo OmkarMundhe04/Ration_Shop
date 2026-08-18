@@ -1,0 +1,26 @@
+# Render.com Blueprint for 1-Click Deployment
+# Deploys Web Service (PHP 8.2 with Apache) and Managed MySQL Database
+
+services:
+  # Web Application Service
+  - type: web
+    name: ration-shop-app
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ration-shop-db
+          property: connectionString
+      - key: DB_NAME
+        value: ration_shop
+
+databases:
+  # Managed Cloud Database
+  - name: ration-shop-db
+    databaseName: ration_shop
+    user: ration_user
+    plan: free
+    region: oregon

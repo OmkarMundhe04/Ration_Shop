@@ -1,0 +1,15 @@
+{
+  "name": "Online Ration Shop & Slot Booking Portal",
+  "description": "Smart cloud-ready Ration Distribution and Appointment Booking System",
+  "keywords": ["php", "mysql", "ration-shop", "pds", "docker", "cloud"],
+  "image": "heroku/php",
+  "addons": [
+    "jawsdb:kitefin"
+  ],
+  "env": {
+    "DB_NAME": {
+      "description": "Database Name",
+      "value": "ration_shop"
+    }
+  }
+}

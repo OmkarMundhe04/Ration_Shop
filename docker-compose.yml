@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # Web Application Service (PHP 8.2 + Apache)
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ration_shop_web
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=ration_user
+      - DB_PASS=ration_pass_secure
+      - DB_NAME=ration_shop
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./:/var/www/html
+    networks:
+      - ration_net
+
+  # Database Service (MySQL 8.0)
+  db:
+    image: mysql:8.0
+    container_name: ration_shop_db
+    restart: always
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword123
+      MYSQL_DATABASE: ration_shop
+      MYSQL_USER: ration_user
+      MYSQL_PASSWORD: ration_pass_secure
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword123"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - ration_net
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  ration_net:
+    driver: bridge
