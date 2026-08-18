@@ -33,18 +33,53 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_csv') {
     exit();
 }
 
-// Handle Status Update
+// Handle Status Update & Deletion
 $status_notice = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status_id'], $_POST['new_status'])) {
-    $booking_id = intval($_POST['update_status_id']);
-    $new_status = trim($_POST['new_status']);
-    if (in_array($new_status, ['confirmed', 'completed', 'cancelled']) && $pdo) {
-        try {
-            $update_stmt = $pdo->prepare("UPDATE bookings SET status = ? WHERE id = ?");
-            $update_stmt->execute([$new_status, $booking_id]);
-            $status_notice = "Booking #" . $booking_id . " status updated to " . ucfirst($new_status) . ".";
-        } catch (Exception $e) {
-            $status_notice = "Failed to update status: " . $e->getMessage();
+$notice_type = 'success';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // 1. Update Booking Status
+    if (isset($_POST['update_status_id'], $_POST['new_status'])) {
+        $booking_id = intval($_POST['update_status_id']);
+        $new_status = trim($_POST['new_status']);
+        if (in_array($new_status, ['confirmed', 'completed', 'cancelled']) && $pdo) {
+            try {
+                $update_stmt = $pdo->prepare("UPDATE bookings SET status = ? WHERE id = ?");
+                $update_stmt->execute([$new_status, $booking_id]);
+                $status_notice = "Booking #" . $booking_id . " status updated to " . ucfirst($new_status) . ".";
+                $notice_type = 'success';
+            } catch (Exception $e) {
+                $status_notice = "Failed to update status: " . $e->getMessage();
+                $notice_type = 'danger';
+            }
+        }
+    }
+
+    // 2. Delete Booking Record (Admin Only)
+    if (isset($_POST['delete_booking_id'])) {
+        $delete_id = intval($_POST['delete_booking_id']);
+        if ($delete_id > 0 && $pdo) {
+            try {
+                // Fetch token number and citizen name for clear feedback
+                $fetch_stmt = $pdo->prepare("SELECT b.token_number, u.name FROM bookings b JOIN users u ON b.user_id = u.id WHERE b.id = ?");
+                $fetch_stmt->execute([$delete_id]);
+                $deleted_record = $fetch_stmt->fetch(PDO::FETCH_ASSOC);
+
+                $delete_stmt = $pdo->prepare("DELETE FROM bookings WHERE id = ?");
+                $delete_stmt->execute([$delete_id]);
+
+                if ($delete_stmt->rowCount() > 0) {
+                    $token_info = $deleted_record ? " (Token: {$deleted_record['token_number']}, Citizen: {$deleted_record['name']})" : "";
+                    $status_notice = "Record #" . $delete_id . $token_info . " was permanently deleted.";
+                    $notice_type = 'success';
+                } else {
+                    $status_notice = "Record #" . $delete_id . " was not found or has already been deleted.";
+                    $notice_type = 'danger';
+                }
+            } catch (Exception $e) {
+                $status_notice = "Failed to delete record: " . $e->getMessage();
+                $notice_type = 'danger';
+            }
         }
     }
 }
@@ -183,8 +218,8 @@ if ($pdo) {
     <main class="main-container">
         
         <?php if (!empty($status_notice)): ?>
-            <div class="alert alert-success">
-                <span>✅</span>
+            <div class="alert <?= ($notice_type === 'danger') ? 'alert-danger' : 'alert-success'; ?>">
+                <span><?= ($notice_type === 'danger') ? '⚠️' : '✅'; ?></span>
                 <div><?= htmlspecialchars($status_notice); ?></div>
             </div>
         <?php endif; ?>
@@ -285,6 +320,7 @@ if ($pdo) {
                         <th>Slot Schedule</th>
                         <th>Status</th>
                         <th>Update Status</th>
+                        <th style="text-align: right;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -337,11 +373,19 @@ if ($pdo) {
                                         </select>
                                     </form>
                                 </td>
+                                <td style="text-align: right; white-space: nowrap;">
+                                    <button type="button" 
+                                            class="btn-delete" 
+                                            onclick="openDeleteModal(<?= (int)$b['id']; ?>, '<?= htmlspecialchars($b['token_number'], ENT_QUOTES); ?>', '<?= htmlspecialchars($b['name'], ENT_QUOTES); ?>', '<?= htmlspecialchars(date('d M Y', strtotime($b['booking_date'])), ENT_QUOTES); ?>', '<?= htmlspecialchars($b['time_slot'], ENT_QUOTES); ?>')" 
+                                            title="Delete Record">
+                                        🗑️ Delete
+                                    </button>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="7" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+                            <td colspan="8" style="text-align: center; padding: 3rem; color: var(--text-muted);">
                                 <div style="font-size: 2rem; margin-bottom: 0.5rem;">📋</div>
                                 <div>No distribution appointments match your filter criteria.</div>
                             </td>
@@ -353,9 +397,89 @@ if ($pdo) {
 
     </main>
 
+    <!-- Delete Confirmation Modal (Admin Exclusive) -->
+    <div id="deleteModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-header-content">
+                    <div class="modal-icon-danger">⚠️</div>
+                    <h3 class="modal-title" id="modalTitle">Delete Record Confirmation</h3>
+                </div>
+                <button type="button" class="modal-close" onclick="closeDeleteModal()" aria-label="Close modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-warning-text">Are you sure you want to delete this record?</p>
+                <div class="record-preview-box">
+                    <div class="record-preview-row">
+                        <span class="record-preview-label">Record ID:</span>
+                        <span class="record-preview-value" id="modalRecordId">#---</span>
+                    </div>
+                    <div class="record-preview-row">
+                        <span class="record-preview-label">Token Number:</span>
+                        <span class="record-preview-value font-mono" id="modalRecordToken" style="font-family:monospace; color:var(--primary);">---</span>
+                    </div>
+                    <div class="record-preview-row">
+                        <span class="record-preview-label">Citizen Name:</span>
+                        <span class="record-preview-value" id="modalRecordCitizen">---</span>
+                    </div>
+                    <div class="record-preview-row">
+                        <span class="record-preview-label">Scheduled Slot:</span>
+                        <span class="record-preview-value" id="modalRecordSlot">---</span>
+                    </div>
+                </div>
+                <p class="modal-subtext">
+                    ⚠️ <strong>Warning:</strong> This action cannot be undone. The appointment record and slot allocation will be permanently deleted from the database.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+                <form method="POST" action="admin.php" id="deleteForm" style="display:inline;">
+                    <input type="hidden" name="delete_booking_id" id="deleteInputId" value="">
+                    <button type="submit" class="btn btn-danger">
+                        🗑️ Yes, Delete Record
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="site-footer" style="background: #0f172a; color: #64748b; border-color: rgba(255, 255, 255, 0.08);">
         <p>&copy; <?= date('Y'); ?> Online Public Distribution System - Administration Console</p>
     </footer>
+
+    <script>
+        function openDeleteModal(id, token, citizen, date, slot) {
+            document.getElementById('deleteInputId').value = id;
+            document.getElementById('modalRecordId').textContent = '#' + id;
+            document.getElementById('modalRecordToken').textContent = token;
+            document.getElementById('modalRecordCitizen').textContent = citizen;
+            document.getElementById('modalRecordSlot').textContent = date + ' (' + slot + ')';
+            
+            const modal = document.getElementById('deleteModal');
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeDeleteModal() {
+            const modal = document.getElementById('deleteModal');
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // Close when clicking outside modal-card
+        document.getElementById('deleteModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDeleteModal();
+            }
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.getElementById('deleteModal').classList.contains('active')) {
+                closeDeleteModal();
+            }
+        });
+    </script>
 </body>
 </html>

@@ -21,6 +21,7 @@ A cloud-ready, secure, and modern **Public Distribution System (PDS) Web Portal*
 - **Real-Time KPIs**: Track registered citizens, total bookings, today's appointments, and card distribution breakdown.
 - **Search & Multi-Filter**: Filter by citizen name, card number, category, date, or appointment status.
 - **Live Status Management**: Mark bookings as *Confirmed*, *Completed*, or *Cancelled*.
+- **Admin-Only Record Deletion**: Secure deletion of appointment records with an interactive confirmation modal displaying token and citizen details before permanent removal.
 - **One-Click CSV Export**: Instant export of all booking records for offline departmental reporting.
 
 ---
