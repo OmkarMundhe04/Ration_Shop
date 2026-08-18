@@ -12,7 +12,7 @@ Options -Indexes
 AddDefaultCharset UTF-8
 
 # 4. Protect Sensitive Files from Web Access
-<FilesMatch "^(\.env|\.git|\.dockerignore|Dockerfile|docker-compose\.yml|schema\.sql|render\.yaml|fly\.toml|railway\.json|nixpacks\.toml|composer\.(json|lock))$">
+<FilesMatch "^(\.env|\.git|\.dockerignore|Dockerfile|docker-compose\.yml|schema\.sql|render\.yaml|fly\.toml|railway\.json|nixpacks\.toml|composer\.(json|lock)|\.sqlite)$">
     Order allow,deny
     Deny from all
 </FilesMatch>

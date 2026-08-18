@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $stmt = $pdo->prepare("
             INSERT INTO bookings (user_id, ration_card_type, booking_date, time_slot, token_number, status, created_at) 
-            VALUES (?, ?, ?, ?, ?, 'confirmed', NOW())
+            VALUES (?, ?, ?, ?, ?, 'confirmed', CURRENT_TIMESTAMP)
         ");
         $stmt->execute([$user_id, $ration_card_type, $booking_date, $time_slot, $token_number]);
 

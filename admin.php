@@ -61,7 +61,9 @@ if ($pdo) {
     try {
         $total_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
         $total_bookings = $pdo->query("SELECT COUNT(*) FROM bookings")->fetchColumn();
-        $today_bookings = $pdo->query("SELECT COUNT(*) FROM bookings WHERE booking_date = CURDATE()")->fetchColumn();
+        $today_stmt = $pdo->prepare("SELECT COUNT(*) FROM bookings WHERE booking_date = ?");
+        $today_stmt->execute([date('Y-m-d')]);
+        $today_bookings = $today_stmt->fetchColumn();
         
         $card_counts = $pdo->query("SELECT ration_card_type, COUNT(*) as count FROM bookings GROUP BY ration_card_type")->fetchAll();
         foreach ($card_counts as $cc) {
